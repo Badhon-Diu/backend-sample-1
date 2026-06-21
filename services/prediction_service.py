@@ -1,0 +1,124 @@
+import joblib
+from pathlib import Path
+
+from utils.feature_engineering import (
+    create_features
+)
+
+from services.risk_service import (
+    calculate_risk_level
+)
+
+from services.health_service import (
+    calculate_health_score
+)
+
+from services.explanation_service import (
+    analyze_root_causes
+)
+
+from services.explainability_service import (
+    get_top_contributors
+)
+
+from services.recommendation_service import (
+    generate_recommendations
+)
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+MODEL_PATH = (
+    BASE_DIR
+    / "models"
+    / "Final_Model.pkl"
+)
+
+model = joblib.load(
+    MODEL_PATH
+)
+print(type(model))
+
+def predict_machine_failure(data):
+
+    features = create_features(
+        data
+    )
+
+    prediction = model.predict(
+        features
+    )[0]
+
+    probability = round(
+    float(
+        model.predict_proba(
+            features
+        )[0][1] * 100
+    ),
+    2
+)
+
+    #Risk Level Prediction
+    risk_level = calculate_risk_level(
+    probability
+    )
+
+    root_causes = analyze_root_causes(
+    data
+    )
+
+    #health score
+    health_score = calculate_health_score(
+    probability=probability,
+    root_causes=root_causes
+    )
+
+
+    
+
+
+    model_explanations = (
+    get_top_contributors(
+        model=model,
+        features=features
+    )
+) 
+    recommendations = (
+    generate_recommendations(
+        risk_level=risk_level,
+        root_causes=root_causes,
+        model_explanations=model_explanations
+    )
+)
+
+
+    return {
+
+    "company_name": data.company_name,
+    "machine_id": data.machine_id,
+    "machine_type": data.machine_type,
+
+    "prediction": (
+        "Failure"
+        if prediction == 1
+        else "No Failure"
+    ),
+
+    "probability": float(
+        round(
+            probability,
+            2
+        )
+    ),
+
+    "risk_level": risk_level,
+
+    "health_score": health_score,
+
+    "root_causes": root_causes,
+
+    "model_explanations": model_explanations,
+
+    "recommendations": recommendations
+
+}
